@@ -1,5 +1,8 @@
 # Rancher Kubernetes PoC
 
+<img width="1784" height="570" alt="image" src="https://github.com/user-attachments/assets/e01b0b42-a194-4da1-a661-4369b3bd9920" />
+
+
 This repository provides a proof-of-concept (PoC) for deploying a production-ready Kubernetes cluster using Vagrant, Terraform/OpenTofu, and Rancher. The deployment includes a full-stack train routing application demonstrating real-world microservices architecture.
 
 ## Repository Structure
