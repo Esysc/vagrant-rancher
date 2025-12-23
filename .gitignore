@@ -1,0 +1,36 @@
+# Ignore Docker volumes
+rancher-data/
+k3s-server/
+k3s-worker/
+
+# Ignore Vagrant
+.vagrant/
+
+# Ignore Terraform state
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+crash.log
+
+# Ignore editor/OS files
+*.swp
+*.swo
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# Ignore Python cache (if any)
+__pycache__/
+*.pyc
+
+# Ignore Node modules
+node_modules/
+
+# Ignore Helm cache
+.helm/
+
+# Ignore VS Code settings
+.vscode/
