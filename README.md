@@ -25,6 +25,74 @@ This repository provides a proof-of-concept (PoC) for deploying a production-rea
 
 ## Architecture
 
+### System Overview
+
+```mermaid
+graph TB
+    subgraph VagrantVMs["🖥️ Vagrant VMs (VirtualBox)"]
+        subgraph RancherVM["rancher-server<br/>192.168.56.10<br/>4GB RAM, 2 CPUs"]
+            Rancher["🐄 Rancher v2.13.1<br/>(Docker Container)"]
+        end
+
+        subgraph K8sControl["k8s-control<br/>192.168.56.11<br/>4GB RAM, 2 CPUs"]
+            ControlPlane["⚙️ RKE2 Control Plane<br/>+ etcd + worker<br/>v1.33.7+rke2r1"]
+        end
+
+        subgraph K8sWorker["k8s-worker<br/>192.168.56.12<br/>4GB RAM, 2 CPUs"]
+            Worker["⚙️ RKE2 Worker Node<br/>v1.33.7+rke2r1"]
+        end
+    end
+
+    subgraph K8sCluster["☸️ Kubernetes Cluster (demo-cluster)"]
+        subgraph TrainApp["🚂 Train Routing App (Namespace: train-app)"]
+            Nginx["🌐 Nginx Gateway<br/>2 replicas<br/>NodePort 30443"]
+            Frontend["🎨 Vue3 Frontend<br/>2 replicas<br/>TypeScript SPA"]
+            Backend["⚡ Symfony Backend<br/>2 replicas<br/>PHP REST API"]
+            Postgres["🗄️ PostgreSQL 16<br/>StatefulSet<br/>Persistent Storage"]
+        end
+        CNI["🔗 Calico CNI<br/>Pod Networking"]
+    end
+
+    User["👤 User<br/>https://192.168.56.11:30443"]
+
+    TerraformOpenTofu["🏗️ Terraform/OpenTofu<br/>Infrastructure as Code"]
+
+    User -->|HTTPS| Nginx
+    Nginx -->|routes| Frontend
+    Nginx -->|/api| Backend
+    Backend -->|SQL| Postgres
+
+    Rancher -.->|manages| K8sCluster
+    ControlPlane -.->|hosts| TrainApp
+    Worker -.->|hosts| TrainApp
+    CNI -.->|networking| TrainApp
+
+    TerraformOpenTofu -->|provisions| VagrantVMs
+    TerraformOpenTofu -->|deploys| Rancher
+    TerraformOpenTofu -->|creates| K8sCluster
+    TerraformOpenTofu -->|deploys| TrainApp
+
+    classDef vmStyle fill:#e1f5ff,stroke:#0288d1,stroke-width:2px,color:#000
+    classDef rancherStyle fill:#0075a8,stroke:#004d6d,stroke-width:2px,color:#fff
+    classDef k8sStyle fill:#326ce5,stroke:#1a4d91,stroke-width:2px,color:#fff
+    classDef appStyle fill:#4caf50,stroke:#2e7d32,stroke-width:2px,color:#fff
+    classDef dbStyle fill:#ff9800,stroke:#e65100,stroke-width:2px,color:#000
+    classDef nginxStyle fill:#009688,stroke:#00695c,stroke-width:2px,color:#fff
+    classDef userStyle fill:#9c27b0,stroke:#6a1b9a,stroke-width:2px,color:#fff
+    classDef infraStyle fill:#607d8b,stroke:#37474f,stroke-width:2px,color:#fff
+    classDef cniStyle fill:#795548,stroke:#4e342e,stroke-width:2px,color:#fff
+
+    class RancherVM,K8sControl,K8sWorker vmStyle
+    class Rancher rancherStyle
+    class ControlPlane,Worker k8sStyle
+    class Frontend,Backend appStyle
+    class Postgres dbStyle
+    class Nginx nginxStyle
+    class User userStyle
+    class TerraformOpenTofu infraStyle
+    class CNI cniStyle
+```
+
 ### Infrastructure
 - **rancher-server** (192.168.56.10): Rancher v2.13.1 in Docker container
 - **k8s-control** (192.168.56.11): RKE2 control plane + etcd + worker (4GB RAM, 2 CPUs)
