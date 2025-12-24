@@ -76,25 +76,10 @@ resource "local_file" "demo_kubeconfig" {
 # =============================================================================
 # Kubernetes Provider for Demo Cluster - Used for app deployment
 # =============================================================================
-locals {
-  kube_cfg         = yamldecode(data.rancher2_cluster_v2.demo_ready.kube_config)
-  kube_cluster     = local.kube_cfg.clusters[0].cluster
-  kube_user        = local.kube_cfg.users[0].user
-  kube_host        = local.kube_cluster.server
-  kube_ca_data     = try(local.kube_cluster["certificate-authority-data"], null)
-  kube_client_cert = try(local.kube_user["client-certificate-data"], null)
-  kube_client_key  = try(local.kube_user["client-key-data"], null)
-  kube_token       = try(local.kube_user.token, try(local.kube_user["auth-provider"].config["access-token"], null))
-}
 
 provider "kubernetes" {
-  alias                  = "demo_cluster"
-  host                   = local.kube_host
-  cluster_ca_certificate = local.kube_ca_data != null ? base64decode(local.kube_ca_data) : null
-  # Prefer token auth when present; fall back to client certs if provided
-  token              = local.kube_token
-  client_certificate = local.kube_client_cert != null ? base64decode(local.kube_client_cert) : null
-  client_key         = local.kube_client_key != null ? base64decode(local.kube_client_key) : null
+  alias       = "demo_cluster"
+  config_path = local_file.demo_kubeconfig.filename
 }
 
 # Ensure Kubernetes provider is ready before deploying resources
