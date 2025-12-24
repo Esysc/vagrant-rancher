@@ -79,18 +79,38 @@ graph TB
     classDef dbStyle fill:#ff9800,stroke:#e65100,stroke-width:2px,color:#000
     classDef nginxStyle fill:#009688,stroke:#00695c,stroke-width:2px,color:#fff
     classDef userStyle fill:#9c27b0,stroke:#6a1b9a,stroke-width:2px,color:#fff
-    classDef infraStyle fill:#607d8b,stroke:#37474f,stroke-width:2px,color:#fff
-    classDef cniStyle fill:#795548,stroke:#4e342e,stroke-width:2px,color:#fff
+   classDef infraStyle fill:#607d8b,stroke:#37474f,stroke-width:2px,color:#fff
+   classDef cniStyle fill:#795548,stroke:#4e342e,stroke-width:2px,color:#fff
 
-    class RancherVM,K8sControl,K8sWorker vmStyle
-    class Rancher rancherStyle
-    class ControlPlane,Worker k8sStyle
-    class Frontend,Backend appStyle
-    class Postgres dbStyle
-    class Nginx nginxStyle
-    class User userStyle
-    class TerraformOpenTofu infraStyle
-    class CNI cniStyle
+   class RancherVM,K8sControl,K8sWorker vmStyle
+   class Rancher rancherStyle
+   class ControlPlane,Worker k8sStyle
+   class Frontend,Backend appStyle
+   class Postgres dbStyle
+   class Nginx nginxStyle
+   class User userStyle
+   class TerraformOpenTofu infraStyle
+   class CNI cniStyle
+```
+
+### Terraform Deployment Workflow
+
+```mermaid
+flowchart TD
+   start["tofu apply"] --> p1["1. Provision VMs"]
+   p1 --> p2["2. Start Rancher"]
+   p2 --> p3["3. Create RKE2 Cluster"]
+   p3 --> p4["4. Register Nodes"]
+   p4 --> p5["5. Sync Cluster to Active"]
+   p5 --> p6["6. Write Kubeconfig"]
+   p6 --> p7["7. Deploy App Stack"]
+   p7 --> done["Done"]
+
+   classDef phase fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000
+   classDef endpoint fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px,color:#000
+
+   class start,done endpoint
+   class p1,p2,p3,p4,p5,p6,p7 phase
 ```
 
 ### Infrastructure
