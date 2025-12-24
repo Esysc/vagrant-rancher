@@ -39,6 +39,9 @@ locals {
   k8s_control_ip      = local.vms[1].ip
   k8s_worker_name     = local.vms[2].name
   k8s_worker_ip       = local.vms[2].ip
+
+  # Output paths
+  kubeconfig_path = "${path.module}/../out/kubeconfig-demo-cluster"
 }
 
 provider "rancher2" {

@@ -64,11 +64,22 @@ data "rancher2_cluster_v2" "demo_ready" {
   depends_on = [rancher2_cluster_sync.demo_active]
 }
 
+# Restore placeholder kubeconfig on destroy to avoid git drift
+# local_file depends on this, so on destroy: local_file deleted first, then this provisioner runs
+resource "terraform_data" "kubeconfig_restore" {
+  input = local.kubeconfig_path
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "git checkout -- ${self.input}"
+  }
+}
+
 # Write the cluster kubeconfig provided by Rancher to disk
 resource "local_file" "demo_kubeconfig" {
-  depends_on           = [data.rancher2_cluster_v2.demo_ready]
+  depends_on           = [data.rancher2_cluster_v2.demo_ready, terraform_data.kubeconfig_restore]
   content              = data.rancher2_cluster_v2.demo_ready.kube_config
-  filename             = "${path.module}/../out/kubeconfig-demo-cluster"
+  filename             = local.kubeconfig_path
   file_permission      = "0640"
   directory_permission = "0770"
 }
