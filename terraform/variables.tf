@@ -9,8 +9,3 @@ variable "versions" {
     kubernetes = "v1.33.7+rke2r1"
   }
 }
-
-variable "iac_exe" {
-  description = "IaC tool executable name"
-  default     = "tofu"
-}
