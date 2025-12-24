@@ -9,9 +9,7 @@ k3s-worker/
 # Ignore Terraform state
 .terraform/
 .terraform.lock.hcl
-*.tfstate
-*.tfstate.backup
-*.tfstate.lock.info
+*.tfstate*
 crash.log
 
 # Ignore editor/OS files
@@ -34,3 +32,6 @@ node_modules/
 
 # Ignore VS Code settings
 .vscode/
+
+# Build/derived outputs
+out/
