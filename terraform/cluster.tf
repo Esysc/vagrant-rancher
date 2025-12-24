@@ -96,3 +96,11 @@ provider "kubernetes" {
   client_certificate = local.kube_client_cert != null ? base64decode(local.kube_client_cert) : null
   client_key         = local.kube_client_key != null ? base64decode(local.kube_client_key) : null
 }
+
+# Ensure Kubernetes provider is ready before deploying resources
+resource "terraform_data" "kubernetes_ready" {
+  depends_on = [
+    data.rancher2_cluster_v2.demo_ready,
+    local_file.demo_kubeconfig
+  ]
+}
