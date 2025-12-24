@@ -20,7 +20,7 @@ resource "kubernetes_namespace_v1" "train_app" {
     name = "train-app"
   }
 
-  depends_on = [rancher2_cluster_sync.demo_active]
+  depends_on = [terraform_data.kubernetes_ready]
 }
 
 # JWT Keys Secret - Replaces shell script that generates and applies secret
