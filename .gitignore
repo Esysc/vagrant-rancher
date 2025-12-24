@@ -33,5 +33,6 @@ node_modules/
 # Ignore VS Code settings
 .vscode/
 
-# Build/derived outputs
-out/
+# Build/derived outputs - keep kubeconfig
+out/*
+!out/kubeconfig-demo-cluster
