@@ -20,5 +20,9 @@ output "app_url" {
 }
 
 output "kubeconfig_path" {
-  value = "${path.module}/../kubeconfig-demo-cluster"
+  value = abspath("${path.module}/../out/kubeconfig-demo-cluster")
+}
+
+output "train_app_namespace" {
+  value = kubernetes_namespace_v1.train_app.metadata[0].name
 }

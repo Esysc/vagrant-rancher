@@ -52,11 +52,28 @@ fi
 REG_CMD=${REG_CMD//curl -fL/curl -fkL}
 echo "Registration command prepared (with SSL verification disabled)"
 
+echo "🧩 Writing rke2 config on k8s-control (fix node-ip & calico iface)..."
+vagrant ssh k8s-control -c "sudo mkdir -p /etc/rancher/rke2 && \
+  echo 'node-ip: ${K8S_CONTROL_IP}
+node-external-ip: ${K8S_CONTROL_IP}
+advertise-address: ${K8S_CONTROL_IP}
+kubelet-arg:
+  - node-ip=${K8S_CONTROL_IP}
+' | sudo tee /etc/rancher/rke2/config.yaml >/dev/null"
+
 echo "📝 Registering k8s-control as controlplane/etcd/worker..."
 if ! vagrant ssh k8s-control -c "sudo $REG_CMD --etcd --controlplane --worker"; then
   echo "❌ Failed to register k8s-control node"
   exit 1
 fi
+
+echo "🧩 Writing rke2 config on k8s-worker (fix node-ip & calico iface)..."
+vagrant ssh k8s-worker -c "sudo mkdir -p /etc/rancher/rke2 && \
+  echo 'node-ip: ${K8S_WORKER_IP}
+node-external-ip: ${K8S_WORKER_IP}
+kubelet-arg:
+  - node-ip=${K8S_WORKER_IP}
+' | sudo tee /etc/rancher/rke2/config.yaml >/dev/null"
 
 echo "📝 Registering k8s-worker as worker..."
 if ! vagrant ssh k8s-worker -c "sudo $REG_CMD --worker"; then

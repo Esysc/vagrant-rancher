@@ -4,6 +4,18 @@ terraform {
       source  = "rancher/rancher2"
       version = ">= 4.0.0"
     }
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = ">= 3.0.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = ">= 4.0.0"
+    }
     null   = { source = "hashicorp/null" }
     local  = { source = "hashicorp/local" }
     random = { source = "hashicorp/random" }
@@ -13,6 +25,9 @@ terraform {
 locals {
   # Read VM configurations from vagrant.yaml
   vagrant_config = yamldecode(file("${path.module}/../vagrant.yaml"))
+
+  # Box name
+  box_name = local.vagrant_config.box_name
 
   # Extract VM names and IPs
   vms = { for vm in local.vagrant_config.vm : vm.name => vm.ip }

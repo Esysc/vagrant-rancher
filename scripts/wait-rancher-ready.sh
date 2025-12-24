@@ -20,7 +20,6 @@ for i in {1..60}; do
   # Check webhook pod status using kubectl inside the rancher container via vagrant ssh
   WEBHOOK_OUTPUT=$(vagrant ssh rancher-server -c \
     "docker exec rancher kubectl get deployment rancher-webhook -n cattle-system -o jsonpath='{.status.readyReplicas}' 2>&1" 2>&1 || true)
-
   echo "DEBUG: WEBHOOK_OUTPUT='$WEBHOOK_OUTPUT'"
 
   WEBHOOK_READY=$(echo "$WEBHOOK_OUTPUT" | grep -E '^[0-9]+$' || echo "0")
@@ -35,7 +34,6 @@ for i in {1..60}; do
     for j in {1..30}; do
       WEBHOOK_CONFIG=$(vagrant ssh rancher-server -c \
         "docker exec rancher kubectl get validatingwebhookconfigurations rancher.cattle.io -o jsonpath='{.webhooks[0].clientConfig.service.name}' 2>/dev/null" 2>/dev/null || echo "")
-
       if [ "$WEBHOOK_CONFIG" = "rancher-webhook" ]; then
         echo "✅ Webhook is registered with API server!"
 
@@ -45,7 +43,6 @@ for i in {1..60}; do
         for m in {1..30}; do
           WEBHOOK_LOGS=$(vagrant ssh rancher-server -c \
             "docker exec rancher kubectl logs -n cattle-system -l app=rancher-webhook --tail=5 2>/dev/null" 2>/dev/null || echo "")
-
           # Check if logs show errors or if webhook is stable
           if echo "$WEBHOOK_LOGS" | grep -qiE "error|failed|panic|crash"; then
             echo "⚠️ Webhook showing errors, waiting... ($m/30)"
@@ -67,7 +64,6 @@ for i in {1..60}; do
         for k in {1..10}; do
           WEBHOOK_HEALTH=$(vagrant ssh rancher-server -c \
             "docker exec rancher kubectl get endpoints rancher-webhook -n cattle-system -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null" 2>/dev/null || echo "")
-
           if [ -n "$WEBHOOK_HEALTH" ]; then
             echo "✅ Webhook endpoint is healthy!"
             echo "✅ Rancher is fully ready!"

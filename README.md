@@ -9,23 +9,89 @@ This repository provides a proof-of-concept (PoC) for deploying a production-rea
 
 - **Vagrantfile**: Vagrant configuration with IPv6 disabled for consistent networking.
 - **vagrant.yaml**: VM specifications (memory, CPUs, IP addresses).
-- **manifests/train-app.yaml**: Kubernetes manifests for the train routing application.
-- **scripts/**: Automation scripts for setup and verification.
+- **scripts/**: Automation scripts for setup.
   - `provision.sh`: Installs Docker, kubectl, Helm, and chrony (time sync).
-  - `install-rancher.sh`: Deploys Rancher server with specific version.
-  - `wait-rancher-ready.sh`: Validates Rancher webhook stability.
+  - `vagrant-parallel-up.sh`: Starts VMs in parallel with box pre-download.
+  - `vagrant-wait-ready.sh`: Waits for all VMs to be SSH-accessible.
   - `register-nodes.sh`: Registers nodes to Rancher cluster with SSL workarounds.
-  - `wait-cluster-ready.sh`: Monitors cluster until active (up to 20 minutes).
-  - `verify-app.sh`: Validates train application deployment.
+   - Cluster readiness handled by `rancher2_cluster_sync`.
 - **terraform/**: Infrastructure as Code with OpenTofu/Terraform.
-  - `main.tf`: Provider configuration and bootstrapping.
+  - `main.tf`: Provider configuration, locals, and bootstrapping.
   - `variables.tf`: Centralized version management for Rancher and Kubernetes.
-  - `rancher.tf`: Rancher installation and VM lifecycle management.
+  - `rancher.tf`: VM lifecycle and Rancher installation via Docker provider.
   - `cluster.tf`: RKE2 cluster provisioning and node registration.
-  - `app.tf`: Train application deployment via kubectl.
+  - `app.tf`: Train application deployment via native Kubernetes resources.
   - `outputs.tf`: Credentials and access URLs.
 
 ## Architecture
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph VagrantVMs["🖥️ Vagrant VMs (VirtualBox)"]
+        subgraph RancherVM["rancher-server<br/>192.168.56.10<br/>4GB RAM, 2 CPUs"]
+            Rancher["🐄 Rancher v2.13.1<br/>(Docker Container)"]
+        end
+
+        subgraph K8sControl["k8s-control<br/>192.168.56.11<br/>4GB RAM, 2 CPUs"]
+            ControlPlane["⚙️ RKE2 Control Plane<br/>+ etcd + worker<br/>v1.33.7+rke2r1"]
+        end
+
+        subgraph K8sWorker["k8s-worker<br/>192.168.56.12<br/>4GB RAM, 2 CPUs"]
+            Worker["⚙️ RKE2 Worker Node<br/>v1.33.7+rke2r1"]
+        end
+    end
+
+    subgraph K8sCluster["☸️ Kubernetes Cluster (demo-cluster)"]
+        subgraph TrainApp["🚂 Train Routing App (Namespace: train-app)"]
+            Nginx["🌐 Nginx Gateway<br/>2 replicas<br/>NodePort 30443"]
+            Frontend["🎨 Vue3 Frontend<br/>2 replicas<br/>TypeScript SPA"]
+            Backend["⚡ Symfony Backend<br/>2 replicas<br/>PHP REST API"]
+            Postgres["🗄️ PostgreSQL 16<br/>StatefulSet<br/>Persistent Storage"]
+        end
+        CNI["🔗 Calico CNI<br/>Pod Networking"]
+    end
+
+    User["👤 User<br/>https://192.168.56.11:30443"]
+
+    TerraformOpenTofu["🏗️ Terraform/OpenTofu<br/>Infrastructure as Code"]
+
+    User -->|HTTPS| Nginx
+    Nginx -->|routes| Frontend
+    Nginx -->|/api| Backend
+    Backend -->|SQL| Postgres
+
+    Rancher -.->|manages| K8sCluster
+    ControlPlane -.->|hosts| TrainApp
+    Worker -.->|hosts| TrainApp
+    CNI -.->|networking| TrainApp
+
+    TerraformOpenTofu -->|provisions| VagrantVMs
+    TerraformOpenTofu -->|deploys| Rancher
+    TerraformOpenTofu -->|creates| K8sCluster
+    TerraformOpenTofu -->|deploys| TrainApp
+
+    classDef vmStyle fill:#e1f5ff,stroke:#0288d1,stroke-width:2px,color:#000
+    classDef rancherStyle fill:#0075a8,stroke:#004d6d,stroke-width:2px,color:#fff
+    classDef k8sStyle fill:#326ce5,stroke:#1a4d91,stroke-width:2px,color:#fff
+    classDef appStyle fill:#4caf50,stroke:#2e7d32,stroke-width:2px,color:#fff
+    classDef dbStyle fill:#ff9800,stroke:#e65100,stroke-width:2px,color:#000
+    classDef nginxStyle fill:#009688,stroke:#00695c,stroke-width:2px,color:#fff
+    classDef userStyle fill:#9c27b0,stroke:#6a1b9a,stroke-width:2px,color:#fff
+    classDef infraStyle fill:#607d8b,stroke:#37474f,stroke-width:2px,color:#fff
+    classDef cniStyle fill:#795548,stroke:#4e342e,stroke-width:2px,color:#fff
+
+    class RancherVM,K8sControl,K8sWorker vmStyle
+    class Rancher rancherStyle
+    class ControlPlane,Worker k8sStyle
+    class Frontend,Backend appStyle
+    class Postgres dbStyle
+    class Nginx nginxStyle
+    class User userStyle
+    class TerraformOpenTofu infraStyle
+    class CNI cniStyle
+```
 
 ### Infrastructure
 - **rancher-server** (192.168.56.10): Rancher v2.13.1 in Docker container
@@ -139,11 +205,16 @@ The application is exposed via NodePort service on port **30443** (HTTPS):
 **Note**: The SSL certificate is self-signed. Your browser will show a security warning - accept it to proceed.
 
 ### Deployment Verification
-The `verify-app.sh` script checks:
-- ✅ PostgreSQL StatefulSet is ready (1/1)
-- ✅ Backend Deployment is ready (2/2)
-- ✅ Frontend Deployment is ready (2/2)
-- ✅ Nginx Gateway Deployment is ready (2/2)
+After `tofu apply` completes, verify the application is running:
+```bash
+vagrant ssh k8s-control -c "sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig=/etc/rancher/rke2/rke2.yaml get pods -n train-app"
+```
+
+Expected output:
+- ✅ PostgreSQL pod is ready (1/1)
+- ✅ Backend pods are ready (2/2)
+- ✅ Frontend pods are ready (2/2)
+- ✅ Nginx Gateway pods are ready (2/2)
 - ✅ All pods are in Running state
 
 ## Version Management
@@ -170,8 +241,10 @@ variable "versions" {
 - ✅ **Fully Automated**: Zero-touch deployment from VMs to running application
 - ✅ **Production Patterns**: StatefulSets, multi-replica deployments, persistent storage
 - ✅ **Rancher-Managed**: Complete Kubernetes lifecycle managed by Rancher
+- ✅ **Native Terraform Resources**: Helm and Kubernetes providers replace shell scripts
+- ✅ **Declarative App Deployment**: Application defined as Terraform resources, not YAML files
 - ✅ **SSL Handling**: Self-signed certificate workarounds for automated registration
-- ✅ **Robust Validation**: Webhook stability checks, cluster readiness monitoring
+- ✅ **Robust Validation**: Cluster readiness via `rancher2_cluster_sync`
 - ✅ **Time Synchronization**: Chrony configured to prevent certificate timing issues
 - ✅ **IPv4 Only**: IPv6 disabled to ensure consistent networking
 - ✅ **Clean Teardown**: Proper dependency ordering with `terraform destroy`
@@ -201,7 +274,7 @@ default = {
 **Important**: Verify version compatibility in [Rancher's support matrix](https://www.suse.com/suse-rancher/support-matrix/all-supported-versions/rancher-v2-13-1/) before changing.
 
 ### Deploy Different Application
-Replace `manifests/train-app.yaml` with your own Kubernetes manifests, or modify `terraform/app.tf` to deploy using Helm charts instead of kubectl.
+Modify `terraform/app.tf` to deploy your own Kubernetes resources using the `kubernetes_*_v1` resources, or add `helm_release` resources for Helm chart deployments.
 
 ## Troubleshooting
 
@@ -250,9 +323,9 @@ vagrant ssh k8s-worker -c "cat /proc/sys/net/ipv6/conf/all/disable_ipv6"  # Shou
    tofu apply -refresh=false
    ```
 
-### Cluster takes longer than 20 minutes
+### Cluster takes longer than 10 minutes
 
-**Symptoms:** `wait-cluster-ready.sh` times out after 20 minutes.
+**Symptoms:** Cluster takes longer than 10 minutes to become Active.
 
 **Cause:** Slow network, resource constraints, or image pull issues.
 
@@ -273,10 +346,7 @@ vagrant ssh k8s-worker -c "cat /proc/sys/net/ipv6/conf/all/disable_ipv6"  # Shou
    vagrant ssh k8s-control -c "sudo journalctl -u rke2-server -f"
    ```
 
-4. **Increase timeout** in `scripts/wait-cluster-ready.sh` (line 10):
-   ```bash
-   for i in {1..360}; do  # Increase from 240 to 360 (30 minutes)
-   ```
+4. If needed, increase the sync wait by re-applying after nodes settle or use `tofu apply -refresh=false` to avoid long refreshes.
 
 ### Registration token not generated
 
@@ -291,12 +361,6 @@ vagrant ssh k8s-worker -c "cat /proc/sys/net/ipv6/conf/all/disable_ipv6"  # Shou
 2. **Check Rancher logs:**
    ```bash
    vagrant ssh rancher-server -c "docker logs rancher --tail 50"
-   ```
-
-3. **Verify cluster exists:**
-   ```bash
-   curl -sk -H "Authorization: Bearer $(cd terraform && tofu output -raw rancher_token)" \
-     https://192.168.56.10/v3/clusters | jq -r '.data[].name'
    ```
 
 ### Time synchronization issues
@@ -352,12 +416,12 @@ vagrant ssh k8s-worker -c "cat /proc/sys/net/ipv6/conf/all/disable_ipv6"  # Shou
 
 1. **Check pod status:**
    ```bash
-   vagrant ssh k8s-control -c "sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig=/etc/rancher/rke2/rke2.yaml get pods -n default"
+   vagrant ssh k8s-control -c "sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig=/etc/rancher/rke2/rke2.yaml get pods -n train-app"
    ```
 
 2. **Check pod logs:**
    ```bash
-   vagrant ssh k8s-control -c "sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig=/etc/rancher/rke2/rke2.yaml logs -n default <pod-name>"
+   vagrant ssh k8s-control -c "sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig=/etc/rancher/rke2/rke2.yaml logs -n train-app <pod-name>"
    ```
 
 3. **Verify images are pullable:**
@@ -365,11 +429,11 @@ vagrant ssh k8s-worker -c "cat /proc/sys/net/ipv6/conf/all/disable_ipv6"  # Shou
    vagrant ssh k8s-worker -c "sudo crictl pull ghcr.io/esysc/defi-fullstack/frontend:latest"
    ```
 
-4. **Re-deploy the application:**
+4. **Re-deploy a specific component:**
    ```bash
    cd terraform
-   tofu taint null_resource.deploy_app
-   tofu apply -target=null_resource.deploy_app
+   tofu taint kubernetes_deployment_v1.backend
+   tofu apply -target=kubernetes_deployment_v1.backend
    ```
 
 ### Clean slate (complete reset)
@@ -415,14 +479,24 @@ vagrant ssh k8s-control -c "free -h && df -h && uptime"
 
 ## Implementation Notes
 
+### Native Terraform Resources
+This project uses native Terraform providers instead of shell scripts where possible:
+- **Docker provider**: Manages Rancher container on rancher-server via SSH
+- **Kubernetes provider**: Deploys all application resources (deployments, services, secrets, configmaps)
+- **TLS provider**: Generates JWT key pairs for the application
+- **Rancher2 provider**: Manages cluster creation and configuration
+
+### Remaining Shell Scripts
+Some operations require shell scripts due to complexity or lack of Terraform provider support:
+- **Vagrant lifecycle**: No Terraform provider for Vagrant VM management
+- **Node registration**: SSH-based RKE2 node registration requires shell commands
+- **Readiness checks**: Polling APIs for cluster/Rancher status
+
 ### SSL Certificate Handling
 Self-signed certificates from Rancher are handled by adding `-k` flag to curl commands in the registration script. This is suitable for PoC/development but should use proper certificates in production.
 
 ### Destroy Order
 Terraform manages destroy order through dependencies. The `vagrant destroy` command is executed via a destroy provisioner on the `vagrant_up` resource, ensuring Rancher resources are cleaned up before VMs are destroyed.
-
-### Webhook Validation
-The `wait-rancher-ready.sh` script monitors webhook pod logs for stability (5 consecutive successful checks over 15 seconds) rather than using simple delays, ensuring Rancher is truly ready before proceeding.
 
 ## License
 
