@@ -29,16 +29,16 @@ locals {
   # Box name
   box_name = local.vagrant_config.box_name
 
-  # Extract VM names and IPs
+  # Extract VM names and IPs from vagrant.yaml
   vms = { for vm in local.vagrant_config.vm : vm.name => vm.ip }
 
-  # VM references
-  rancher_server_ip   = local.vms["rancher-server"]
-  rancher_server_name = "rancher-server"
-  k8s_control_ip      = local.vms["k8s-control"]
-  k8s_control_name    = "k8s-control"
-  k8s_worker_ip       = local.vms["k8s-worker"]
-  k8s_worker_name     = "k8s-worker"
+  # VM references - derived from vms map
+  rancher_server_name = keys(local.vms)[0]
+  rancher_server_ip   = values(local.vms)[0]
+  k8s_control_name    = keys(local.vms)[1]
+  k8s_control_ip      = values(local.vms)[1]
+  k8s_worker_name     = keys(local.vms)[2]
+  k8s_worker_ip       = values(local.vms)[2]
 }
 
 provider "rancher2" {
